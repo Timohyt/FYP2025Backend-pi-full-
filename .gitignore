@@ -1,0 +1,18 @@
+# Ignore all venvs
+venv/
+btraffiProjectv2/venv/
+pitrafficProjectv2/venv/
+
+# Bytecode files
+__pycache__/
+*.pyc
+
+# IDE/editor configs
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
+
+#ignore the images
+snapshots/
