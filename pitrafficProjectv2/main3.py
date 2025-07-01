@@ -1,26 +1,13 @@
+#main.py
 import time
 import requests
-import base64
 from gpio_control import set_led, cleanup_leds
 from camera import capture_image
 from yolo_detect import get_vehicle_count, get_latest_image_for_lane
 from btrafficProjectv2.database import SessionLocal
 
-# ------------------ Configuration ------------------
-
 LANE_SEQUENCE = [1, 2, 3, 4]
-BACKEND_BASE_URL = "http://192.168.1.164:8000/api"
-
-URLS = {
-    "decision": f"{BACKEND_BASE_URL}/decision",
-    "status": f"{BACKEND_BASE_URL}/status",
-    "monitoring": f"{BACKEND_BASE_URL}/monitoring",
-    "manual": f"{BACKEND_BASE_URL}/manual",
-    "analytics": f"{BACKEND_BASE_URL}/analytics",
-    "reports": f"{BACKEND_BASE_URL}/reports"
-}
-
-# ------------------ Initial Setup ------------------
+BACKEND_URL = "http://192.168.1.164:8000/api/decision"
 
 try:
     for lane in LANE_SEQUENCE:
@@ -34,8 +21,6 @@ try:
     print(f"[SYSTEM] Initial lane {first_lane} GREEN for {initial_green_duration}s")
     time.sleep(initial_green_duration)
 
-    # ------------------ Main Loop ------------------
-
     while True:
         current_lane = LANE_SEQUENCE[current_index]
         next_index = (current_index + 1) % len(LANE_SEQUENCE)
@@ -44,47 +29,35 @@ try:
         # Phase 1: Current lane green
         set_led(current_lane, "green")
         print(f"[INFO] Lane {current_lane} GREEN")
-        time.sleep(4)
 
-        # Phase 2: Capture image for next lane
+        time.sleep(4)  # Countdown starts
+
+        # Phase 2: t = 6s remaining ? capture for next lane
+        #capture_image #(next_lane)
+
         with SessionLocal() as db:
-            image_path = capture_image(next_lane, db)
+         image_path = capture_image(next_lane, db)
 
-        time.sleep(3)
+        time.sleep(3)  # From t=6 to t=3
 
-        # Phase 3: Both lanes yellow
+        # Phase 3: Yellow phase for both lanes
         set_led(current_lane, "yellow")
         set_led(next_lane, "yellow")
         print(f"[INFO] Lanes {current_lane} & {next_lane} YELLOW")
         time.sleep(3)
 
-        # Phase 4: Analyze image and get decision
+        # Analyze image & get green duration for next lane
         try:
             latest_image = get_latest_image_for_lane(next_lane)
             count = get_vehicle_count(latest_image)
-
-            # Encode image to base64
-            with open(latest_image, "rb") as img_file:
-                encoded_image = base64.b64encode(img_file.read()).decode("utf-8")
-
-            # Send decision request with image
-            payload = {
-                "lane": next_lane,
-                "count": count,
-                "captured_image": encoded_image  # You can also add boxed_image if needed
-            }
-
-            response = requests.post(URLS["decision"], json=payload)
+            response = requests.post(BACKEND_URL, json={"lane": next_lane, "count": count})
             response.raise_for_status()
-
             green_duration = response.json().get("green_duration", 10)
-            print(f"[INFO] Backend decided {green_duration}s GREEN for lane {next_lane}")
-
         except Exception as e:
-            print(f"[ERROR] Decision failed: {e}")
+            print(f"[ERROR] {e}")
             green_duration = 10
 
-        # Phase 5: Switch lane
+        # Phase 4: Switch lanes
         set_led(current_lane, "red")
         set_led(next_lane, "green")
         print(f"[INFO] Switching to lane {next_lane} GREEN for {green_duration}s")
@@ -92,11 +65,8 @@ try:
 
         current_index = next_index
 
-# ------------------ Exit Gracefully ------------------
-
 except KeyboardInterrupt:
     print("[SYSTEM] Exiting on Ctrl+C")
-
 finally:
     cleanup_leds()
     print("[SYSTEM] GPIO cleanup done.")

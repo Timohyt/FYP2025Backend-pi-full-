@@ -1,6 +1,11 @@
+#camera.py
 import cv2
 import os
 from datetime import datetime
+from btrafficProjectv2.database import get_db
+from btrafficProjectv2.crud import save_captured_image #db function
+from utils.image_utils import img_to_bytes
+
 
 SNAPSHOT_DIR = "snapshots"
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
@@ -27,6 +32,12 @@ def capture_image(lane_number: int) -> str:
 
     cv2.imwrite(filepath, frame)
     print(f"[CAMERA] Captured image for lane {lane_number} at {timestamp}")
+
+    # Save to DB
+    image_bytes = img_to_bytes(frame)
+    with next(get_db()) as db:
+        save_captured_image(db, lane=lane_number, filename=filename, image_data=image_bytes)
+
     return filepath
 
 def show_live_feed():
