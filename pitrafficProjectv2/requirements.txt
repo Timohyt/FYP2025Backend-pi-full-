@@ -5,3 +5,5 @@ torch
 torchvision
 ultralytics
 RPi.GPIO
+numpy
+Pillow  # for image processing utilities

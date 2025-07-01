@@ -6,3 +6,5 @@ sqlalchemy
 mysql-connector-python
 passlib[bcrypt]   #for password hashing (logIn security)
 python-multipart  #for file uploads (in the case of future use)
+python-jose[cryptography] # for JWT tokens if needed later
+requests  # for inter-service communication
