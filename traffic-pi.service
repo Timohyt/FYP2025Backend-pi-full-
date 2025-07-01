@@ -1,0 +1,24 @@
+[Unit]
+Description=Traffic Light Control System (Pi)
+After=network.target traffic-api.service
+Wants=traffic-api.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/traffic-system/pitrafficProjectv2
+Environment=PATH=/home/pi/traffic-system/venv/bin
+Environment=PYTHONPATH=/home/pi/traffic-system
+ExecStart=/home/pi/traffic-system/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=BACKEND_HOST=localhost
+Environment=BACKEND_PORT=8000
+
+[Install]
+WantedBy=multi-user.target 

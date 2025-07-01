@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from passlib.context import CryptContext
 from datetime import datetime
-import json, base64
+import json, base64, os
 
 from database import get_db, engine
 import models
@@ -21,16 +21,23 @@ from pitrafficProjectv2.logger import log
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(
+    title="Traffic Management API",
+    description="REST API for intelligent traffic light management system",
+    version="1.0.0"
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Configure CORS origins from environment variables
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Allow frontend calls; restrict later
+    allow_origins=allowed_origins,  # Restrict to specific origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Specify allowed methods
+    allow_headers=["*"],
 )
 
 # ----------------- SCHEMAS -----------------

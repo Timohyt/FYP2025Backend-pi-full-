@@ -1,6 +1,8 @@
 import time
 import requests
 import base64
+import os
+import sys
 from gpio_control import set_led, cleanup_leds
 from camera import capture_image
 from yolo_detect import get_vehicle_count, get_latest_image_for_lane
@@ -9,7 +11,11 @@ from btrafficProjectv2.database import SessionLocal
 # ------------------ Configuration ------------------
 
 LANE_SEQUENCE = [1, 2, 3, 4]
-BACKEND_BASE_URL = "http://192.168.1.164:8000/api"
+
+# Get backend URL from environment variable
+BACKEND_HOST = os.getenv("BACKEND_HOST", "192.168.1.164")
+BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
+BACKEND_BASE_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}/api"
 
 URLS = {
     "decision": f"{BACKEND_BASE_URL}/decision",
@@ -20,9 +26,25 @@ URLS = {
     "reports": f"{BACKEND_BASE_URL}/reports"
 }
 
+print(f"🔗 Backend API: {BACKEND_BASE_URL}")
+
+# Test backend connectivity
+def test_backend_connection():
+    try:
+        response = requests.get(f"{BACKEND_BASE_URL}/status", timeout=5)
+        print(f"✅ Backend connection successful")
+        return True
+    except Exception as e:
+        print(f"❌ Backend connection failed: {e}")
+        return False
+
 # ------------------ Initial Setup ------------------
 
 try:
+    # Test backend connectivity before starting
+    if not test_backend_connection():
+        print("⚠️  Warning: Backend not accessible, but continuing with local operation")
+    
     for lane in LANE_SEQUENCE:
         set_led(lane, "red")
 
@@ -47,8 +69,12 @@ try:
         time.sleep(4)
 
         # Phase 2: Capture image for next lane
-        with SessionLocal() as db:
-            image_path = capture_image(next_lane, db)
+        try:
+            with SessionLocal() as db:
+                image_path = capture_image(next_lane, db)
+        except Exception as e:
+            print(f"[ERROR] Image capture failed: {e}")
+            image_path = None
 
         time.sleep(3)
 
@@ -59,30 +85,38 @@ try:
         time.sleep(3)
 
         # Phase 4: Analyze image and get decision
-        try:
-            latest_image = get_latest_image_for_lane(next_lane)
-            count = get_vehicle_count(latest_image)
+        green_duration = 10  # Default fallback
+        
+        if image_path:
+            try:
+                latest_image = get_latest_image_for_lane(next_lane)
+                count = get_vehicle_count(latest_image)
 
-            # Encode image to base64
-            with open(latest_image, "rb") as img_file:
-                encoded_image = base64.b64encode(img_file.read()).decode("utf-8")
+                # Encode image to base64
+                with open(latest_image, "rb") as img_file:
+                    encoded_image = base64.b64encode(img_file.read()).decode("utf-8")
 
-            # Send decision request with image
-            payload = {
-                "lane": next_lane,
-                "count": count,
-                "captured_image": encoded_image  # You can also add boxed_image if needed
-            }
+                # Send decision request with image
+                payload = {
+                    "lane": next_lane,
+                    "count": count,
+                    "captured_image": encoded_image # You can also add boxed_image if needed
+                }
 
-            response = requests.post(URLS["decision"], json=payload)
-            response.raise_for_status()
+                response = requests.post(URLS["decision"], json=payload, timeout=10)
+                response.raise_for_status()
 
-            green_duration = response.json().get("green_duration", 10)
-            print(f"[INFO] Backend decided {green_duration}s GREEN for lane {next_lane}")
+                green_duration = response.json().get("green_duration", 10)
+                print(f"[INFO] Backend decided {green_duration}s GREEN for lane {next_lane} (vehicles: {count})")
 
-        except Exception as e:
-            print(f"[ERROR] Decision failed: {e}")
-            green_duration = 10
+            except requests.exceptions.RequestException as e:
+                print(f"[ERROR] Backend request failed: {e}")
+                print(f"[INFO] Using local fallback decision: {green_duration}s")
+            except Exception as e:
+                print(f"[ERROR] Decision processing failed: {e}")
+                print(f"[INFO] Using default duration: {green_duration}s")
+        else:
+            print(f"[WARNING] No image available, using default duration: {green_duration}s")
 
         # Phase 5: Switch lane
         set_led(current_lane, "red")

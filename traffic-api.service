@@ -1,0 +1,30 @@
+[Unit]
+Description=Traffic Management API Server
+After=network.target mysql.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/traffic-system/btrafficProjectv2
+Environment=PATH=/home/pi/traffic-system/venv/bin
+Environment=PYTHONPATH=/home/pi/traffic-system
+ExecStart=/home/pi/traffic-system/venv/bin/python start_api.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=DB_HOST=localhost
+Environment=DB_PORT=3306
+Environment=DB_USER=traffic_user
+Environment=DB_PASSWORD=your_secure_password
+Environment=DB_NAME=traffic_dbP
+Environment=API_HOST=0.0.0.0
+Environment=API_PORT=8000
+Environment=ALLOWED_ORIGINS=http://localhost:3000,http://192.168.1.164:3000
+
+[Install]
+WantedBy=multi-user.target 

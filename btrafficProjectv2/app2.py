@@ -8,6 +8,7 @@ from decision_service import make_decision
 from passlib.context import CryptContext
 from database import get_db, engine
 import models
+from models import AdminUser
 from crud import log_traffic, log_event_to_db, save_captured_image, save_yolo_boxed_image
 from pitrafficProjectv2.logger import log
 import json
